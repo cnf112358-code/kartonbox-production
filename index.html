@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Aplikasi Produksi Karton</title>
+    <!-- Firebase SDK -->
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#165DFF',
+                        success: '#00B42A',
+                        warning: '#FF7D00',
+                        danger: '#F53F3F',
+                        dark: '#1D2129',
+                    }
+                }
+            }
+        }
+    </script>
+    <style type="text/tailwindcss">
+        @layer utilities {
+            .card { @apply bg-white rounded-xl shadow-sm border border-gray-100 p-4 mb-4; }
+            .btn { @apply px-4 py-3 rounded-lg font-medium transition-all duration-200 text-base; }
+            .btn-primary { @apply bg-primary text-white hover:bg-primary/90; }
+            .btn-success { @apply bg-success text-white hover:bg-success/90; }
+            .btn-danger { @apply bg-danger text-white hover:bg-danger/90; }
+            .btn-warning { @apply bg-warning text-white hover:bg-warning/90; }
+            .btn-secondary { @apply bg-gray-500 text-white hover:bg-gray-600; }
+            .input { @apply w-full px-3 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/30 focus:border-primary text-base; }
+            .label { @apply block text-sm font-medium text-gray-700 mb-1; }
+            .badge { @apply px-2 py-1 rounded-full text-xs font-medium; }
+            .check-item { @apply flex items-center gap-2 p-3 border rounded-lg mb-3 cursor-pointer hover:bg-gray-50; }
+            .check-item.active { @apply border-success bg-green-50; }
+            .cetak-hilang { @apply print:hidden; }
+            .cetak-judul { @apply hidden print:block text-center text-xl font-bold mb-4; }
+            .login-card { @apply bg-white p-6 rounded-2xl shadow-xl w-full max-w-md mx-4; }
+            .tab-btn { @apply flex-1 py-3 px-2 text-sm font-medium rounded-lg transition-all; }
+            .tab-btn.active { @apply bg-primary text-white; }
+            .proses-badge { @apply px-2 py-1 rounded text-xs font-medium; }
+            .info-teks { @apply text-xs text-blue-600 bg-blue-50 p-2 rounded-lg mb-3; }
+            .info-sinkron { @apply text-xs text-green-600 bg-green-50 p-2 rounded-lg mb-3; }
+        }
+    </style>
+    <style media="print">
+        body { background: white; font-size: 12pt; }
+        .card { border: none; box-shadow: none; padding: 0; }
+        table { width: 100%; border-collapse: collapse; font-size: 10pt; }
+        th, td { border: 1px solid #000; padding: 6px 4px; text-align: center; }
+        th { background-color: #f0f0f0; font-weight: bold; }
+        thead { display: table-header-group; }
+    </style>
+</head>
+<body class="bg-gray-50 text-dark min-h-screen">
+
+    <!-- HALAMAN LOGIN -->
+    <div id="halamanLogin" class="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 p-4">
+        <div class="login-card">
+            <div class="text-center mb-6">
+                <i class="fa-solid fa-user-shield text-4xl text-primary mb-2"></i>
+                <h2 class="text-xl font-bold">Login Admin</h2>
+                <p class="text-gray-500 text-sm mt-1">Akses Pengelolaan Produksi & Stok</p>
+            </div>
+            <form id="formLogin">
+                <div class="mb-4">
+                    <label class="label">Username</label>
+                    <input type="text" id="username" class="input" placeholder="Masukkan Username" required autocomplete="username">
+                </div>
+                <div class="mb-5">
+                    <label class="label">Password</label>
+                    <input type="password" id="password" class="input" placeholder="Masukkan Password" required autocomplete="current-password">
+                </div>
+                <div id="pesanError" class="text-danger text-sm mb-3 hidden"></div>
+                <button type="submit" class="btn btn-primary w-full">Masuk ke Aplikasi</button>
+            </form>
+            <p class="text-xs text-gray-400 text-center mt-4">Username: admin | Password: admin123</p>
+        </div>
+    </div>
+
+    <!-- HALAMAN UTAMA -->
+    <div id="halamanUtama" class="hidden">
+        <header class="bg-primary text-white py-4 shadow-md cetak-hilang sticky top-0 z-10">
+            <div class="container mx-auto px-3">
+                <div class="flex justify-between items-center">
+                    <div>
+                        <h1 class="text-lg font-bold flex items-center gap-2">
+                            <i class="fa-solid fa-box"></i> Produksi Karton
+                        </h1>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs bg-white/20 px-2 py-1 rounded">✅ Terhubung & Tersinkronisasi</span>
+                        <button id="btnKeluar" class="btn bg-white/20 text-sm py-2 px-3">
+                            <i class="fa-solid fa-right-from-bracket"></i>
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </header>
+
+        <main class="container mx-auto px-3 py-4 pb-20">
+            <div class="info-sinkron">
+                <i class="fa-solid fa-cloud mr-1"></i> Data tersimpan di server pusat, akan tampil sama di semua perangkat!
+            </div>
+
+            <!-- Tab Menu -->
+            <div class="flex gap-2 mb-4 cetak-hilang overflow-x-auto pb-1">
+                <button class="tab-btn active" data-tab="stok">Stok</button>
+                <button class="tab-btn" data-tab="input">Input</button>
+                <button class="tab-btn" data-tab="monitoring">Monitoring Proses</button>
+                <button class="tab-btn" data-tab="riwayat">Barang Tersimpan</button>
+            </div>
+
+            <!-- TAB 1: STOK BAHAN BAKU -->
+            <div id="tab-stok" class="tab-content">
+                <div class="card mb-4 cetak-hilang">
+                    <h3 class="text-base font-semibold mb-3 flex items-center gap-2">
+                        <i class="fa-solid fa-plus-circle text-success"></i> Terima Bahan Masuk
+                    </h3>
+                    <div class="grid grid-cols-1 gap-3">
+                        <div>
+                            <label class="label">Jenis Bahan</label>
+                            <select id="jenisBahanMasuk" class="input">
+                                <option value="Carton Sheet">Carton Sheet</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="label">Ukuran</label>
+                            <select id="ukuranBahanMasuk" class="input">
+                                <option value="Uk180x360 K200">Uk180x360 K200</option>
+                                <option value="Uk200x300 K200">Uk200x300 K200</option>
+                                <option value="Uk200x300 K275">Uk200x300 K275</option>
+                                <option value="Uk245x300 K200">Uk245x300 K200</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="label">Jumlah Masuk</label>
+                            <input type="number" id="jumlahBahanMasuk" class="input" min="1" required>
+                        </div>
+                        <div>
+                            <label class="label">Satuan</label>
+                            <select id="satuanBahanMasuk" class="input">
+                                <option value="Lembar" selected>Lembar</option>
+                                <option value="Bundle">Bundle</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="mt-4 flex flex-col gap-2">
+                        <button id="btnTerimaBahan" class="btn btn-success w-full">Simpan Bahan</button>
+                        <button id="btnResetStok" class="btn btn-danger w-full">🗑️ Reset Semua Stok</button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3 class="text-base font-semibold mb-3">Daftar Stok Bahan Baku</h3>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-xs">
+                            <thead class="bg-gray-100">
+                                <tr>
+                                    <th class="p-2 text-left">Ukuran</th>
+                                    <th class="p-2 text-center">Masuk</th>
+                                    <th class="p-2 text-center">Keluar</th>
+                                    <th class="p-2 text-center">Sisa</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabelStokBody">
+                                <tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Memuat data...</td></tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: INPUT PRODUKSI -->
+            <div id="tab-input" class="tab-content hidden">
+                <div class="info-teks">
+                    💡 Catatan: Data dalam proses bisa disimpan tanpa isi Rak. Isi Rak hanya wajib jika proses sudah SELESAI.
+                </div>
+                <form id="formProduksi" class="space-y-4">
+                    <div class="card">
+                        <h3 class="text-base font-semibold mb-3">Data Umum</h3>
+                        <div class="grid grid-cols-1 gap-3">
+                            <div><label class="label">Tanggal</label><input type="date" id="tanggal" class="input" required></div>
+                            <div><label class="label">No PO</label><input type="text" id="noPo" class="input" required></div>
+                            <div><label class="label">Kode Produk</label><input type="text" id="kodeProduk" class="input" required></div>
+                            <div><label class="label">Ukuran Karton</label><input type="text" id="ukuranProduk" class="input" placeholder="P×L×T cm" required></div>
+                            <div><label class="label">Qty (Pcs)</label><input type="number" id="target" class="input" min="1" required></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3 class="text-base font-semibold mb-3">Pemakaian Carton Sheet</h3>
+                        <div class="grid grid-cols-1 gap-3">
+                            <div><label class="label">Uk180x360 K200</label><input type="number" id="pakaiUk1" class="input" min="0" value="0" placeholder="Lembar"></div>
+                            <div><label class="label">Uk200x300 K200</label><input type="number" id="pakaiUk2" class="input" min="0" value="0" placeholder="Lembar"></div>
+                            <div><label class="label">Uk200x300 K275</label><input type="number" id="pakaiUk3" class="input" min="0" value="0" placeholder="Lembar"></div>
+                            <div><label class="label">Uk245x300 K200</label><input type="number" id="pakaiUk4" class="input" min="0" value="0" placeholder="Lembar"></div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3 class="text-base font-semibold mb-3">Tahap Proses</h3>
+                        
+                        <div class="check-item" id="prosesPotong">
+                            <input type="checkbox" id="cekPotong" class="w-5 h-5 text-primary">
+                            <label for="cekPotong" class="font-medium">Proses Pemotongan Selesai</label>
+                        </div>
+                        <div class="mb-3">
+                            <input type="number" id="potongMasuk" class="input" placeholder="Hasil Potong (Pcs)" min="0" value="0">
+                        </div>
+
+                        <div class="check-item" id="prosesCetak">
+                            <input type="checkbox" id="cekCetak" class="w-5 h-5 text-primary">
+                            <label for="cekCetak" class="font-medium">Proses Pencetakan Selesai</label>
+                        </div>
+                        <div class="mb-3">
+                            <input type="number" id="cetakMasuk" class="input" placeholder="Hasil Cetak (Pcs)" min="0" value="0">
+                        </div>
+
+                        <div class="check-item" id="prosesLem">
+                            <input type="checkbox" id="cekLem" class="w-5 h-5 text-primary">
+                            <label for="cekLem" class="font-medium">Proses Pengeleman Selesai</label>
+                        </div>
+                        <div class="mb-3">
+                            <input type="number" id="lemMasuk" class="input" placeholder="Hasil Lem (Pcs)" min="0" value="0">
+                        </div>
+
+                        <div class="mt-4 pt-3 border-t">
+                            <label class="label font-semibold">Hasil Akhir Jadi (Pcs)</label>
+                            <input type="number" id="lemBagus" class="input" placeholder="Jumlah karton jadi bagus" min="0" value="0">
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <h3 class="text-base font-semibold mb-3">Penyimpanan</h3>
+                        <div class="grid grid-cols-1 gap-3">
+                            <div><label class="label">Kode Rak <span class="text-red-500 text-xs">(Wajib diisi jika proses selesai)</span></label>
+                            <input type="text" id="kodeRak" class="input" placeholder="Contoh: Rak A-03"></div>
+                            <div><label class="label">Keterangan</label><select id="keterangan" class="input">
+                                <option>Belum Disimpan</option>
+                                <option>Siap Kirim</option>
+                                <option>Stok Cadangan</option>
+                            </select></div>
+                        </div>
+                    </div>
+
+                    <div class="flex flex-col gap-3 cetak-hilang">
+                        <button type="reset" class="btn bg-gray-200">Reset Form</button>
+                        <button type="submit" class="btn btn-primary">Simpan Data Produksi</button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- TAB 3: MONITORING TAHAPAN PROSES -->
+            <div id="tab-monitoring" class="tab-content hidden">
+                <h2 class="cetak-judul">MONITORING TAHAPAN PROSES PRODUKSI</h2>
+
+                <div class="card cetak-hilang">
+                    <h3 class="text-base font-semibold mb-3">Filter Data Monitoring</h3>
+                    <div class="grid grid-cols-1 gap-3 mb-3">
+                        <div><label class="label">Tanggal Mulai</label><input type="date" id="monitorTglMulai" class="input"></div>
+                        <div><label class="label">Tanggal Selesai</label><input type="date" id="monitorTglSelesai" class="input"></div>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <button id="btnTampilMonitor" class="btn btn-primary">Tampilkan Monitoring</button>
+                        <div class="flex gap-2">
+                            <button id="btnCetakMonitor" class="btn btn-success flex-1"><i class="fa-solid fa-print mr-2"></i> Cetak</button>
+                            <button id="btnUnduhMonitor" class="btn btn-warning flex-1"><i class="fa-solid fa-file-excel mr-2"></i> Unduh Excel</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card overflow-x-auto">
+                    <h3 class="text-base font-semibold mb-3">Daftar Semua Proses (Selesai & Belum)</h3>
+                    <table class="w-full text-xs">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="p-2">Tgl</th>
+                                <th class="p-2">No PO</th>
+                                <th class="p-2">Qty</th>
+                                <th class="p-2">Potong</th>
+                                <th class="p-2">Cetak</th>
+                                <th class="p-2">Lem</th>
+                                <th class="p-2">Jadi</th>
+                                <th class="p-2">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelMonitoringBody">
+                            <tr><td colspan="8" class="p-4 text-center text-gray-500 italic">Tekan tombol Tampilkan untuk melihat data</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+
+            <!-- TAB 4: BARANG TERSIMPAN / LAPORAN -->
+            <div id="tab-riwayat" class="tab-content hidden">
+                <h2 class="cetak-judul">DAFTAR BARANG TERSIMPAN (SELESAI PROSES)</h2>
+
+                <div class="card cetak-hilang">
+                    <h3 class="text-base font-semibold mb-3">Filter Data</h3>
+                    <div class="grid grid-cols-1 gap-3 mb-3">
+                        <div><label class="label">Tanggal Mulai</label><input type="date" id="tglMulai" class="input"></div>
+                        <div><label class="label">Tanggal Selesai</label><input type="date" id="tglSelesai" class="input"></div>
+                        <div><label class="label">Pilih Bulan</label><input type="month" id="pilihBulan" class="input"></div>
+                    </div>
+                    <div class="flex gap-2 mb-3">
+                        <button id="btnCari" class="btn btn-primary flex-1">Tampilkan</button>
+                        <button id="btnReset" class="btn bg-gray-200">Reset</button>
+                    </div>
+                    <div class="flex flex-col gap-2">
+                        <button id="btnCetak" class="btn btn-success"><i class="fa-solid fa-print mr-2"></i> Cetak Laporan</button>
+                        <button id="eksporExcel" class="btn btn-warning"><i class="fa-solid fa-file-excel mr-2"></i> Unduh Excel</button>
+                        <button id="btnResetProduksi" class="btn btn-danger mt-2"><i class="fa-solid fa-trash mr-2"></i> Reset Semua Data</button>
+                    </div>
+                </div>
+
+                <div class="card mb-3">
+                    <div id="infoPeriode" class="text-center font-semibold mb-3 text-sm"></div>
+                    <div id="ringkasanCetak" class="grid grid-cols-2 gap-2"></div>
+                </div>
+
+                <div class="card overflow-x-auto">
+                    <h3 class="text-base font-semibold mb-3">Daftar Barang Tersimpan di Gudang</h3>
+                    <table class="w-full text-xs">
+                        <thead class="bg-gray-100">
+                            <tr>
+                                <th class="p-2 text-left">Tgl</th>
+                                <th class="p-2 text-left">No PO</th>
+                                <th class="p-2 text-left">Kode Rak</th>
+                                <th class="p-2 text-center">Qty</th>
+                                <th class="p-2 text-center">Hasil</th>
+                                <th class="p-2 text-center">%</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tabelRiwayatBody"></tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script>
+        // ==============================================
+        // 🔧 TEMPEL KODE KONFIGURASI FIREBASE ANDA DI BAWAH INI
+        // ==============================================
+        const firebaseConfig = {
+            apiKey: "AIzaSyBcMGYnx4VWZQGoXhTrEaw5Afzmmi7p8Ds",
+            authDomain: "kartonbox-monitoring.firebaseapp.com",
+            databaseURL: "https://kartonbox-monitoring-default-rtdb.firebaseio.com",
+            projectId: "kartonbox-monitoring",
+            storageBucket: "kartonbox-monitoring.appspot.com",
+            messagingSenderId: "277131019218",
+            appId: "1:277131019218:web:aa7edbe3e4ac7265d6fe0b",
+            measurementId: "G-SZMYQVQ8GM"
+        };
+
+        // Inisialisasi Firebase
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const akunAdmin = { username: "admin", password: "admin123" };
+        const sandiReset = "reset123";
+        let dataMonitoring = [];
+        let stokBahan = [];
+        let dataProduksi = [];
+        let dataTerfilter = [];
+
+        document.getElementById('formLogin').addEventListener('submit', e => {
+            e.preventDefault();
+            const user = document.getElementById('username').value.trim();
+            const pass = document.getElementById('password').value.trim();
+            const pesan = document.getElementById('pesanError');
+            if(user === akunAdmin.username && pass === akunAdmin.password) {
+                localStorage.setItem('statusLogin', 'admin');
+                document.getElementById('halamanLogin').classList.add('hidden');
+                document.getElementById('halamanUtama').classList.remove('hidden');
+                muatDataDariServer();
+            } else {
+                pesan.textContent = "Username atau Password salah!";
+                pesan.classList.remove('hidden');
+            }
+        });
+
+        document.getElementById('btnKeluar').addEventListener('click', () => {
+            localStorage.removeItem('statusLogin');
+            location.reload();
+        });
+
+        function cekLogin() {
+            if(localStorage.getItem('statusLogin') === 'admin') {
+                document.getElementById('halamanLogin').classList.add('hidden');
+                document.getElementById('halamanUtama').classList.remove('hidden');
+                muatDataDariServer();
+            }
+        }
+
+        // Memuat data langsung dari server pusat
+        function muatDataDariServer() {
+            // Muat Stok
+            db.ref('stokBahan').on('value', snapshot => {
+                stokBahan = snapshot.val() || [];
+                tampilkanStok();
+            });
+            // Muat Produksi
+            db.ref('dataProduksi').on('value', snapshot => {
+                dataProduksi = snapshot.val() || [];
+                tampilkanRiwayat();
+            });
+            document.getElementById('tanggal').valueAsDate = new Date();
+        }
+
+        // Simpan data ke server pusat
+        async function simpanStokKeServer() {
+            await db.ref('stokBahan').set(stokBahan);
+        }
+        async function simpanProduksiKeServer() {
+            await db.ref('dataProduksi').set(dataProduksi);
+        }
+
+        document.querySelectorAll('.tab-btn').forEach(btn => {
+            btn.addEventListener('click', () => {
+                document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.add('hidden'));
+                btn.classList.add('active');
+                document.getElementById(`tab-${btn.dataset.tab}`).classList.remove('hidden');
+                if(btn.dataset.tab === 'stok') tampilkanStok();
+                if(btn.dataset.tab === 'riwayat') tampilkanRiwayat();
+                window.scrollTo(0,0);
+            });
+        });
+
+        ['cekPotong','cekCetak','cekLem'].forEach(id => {
+            const cek = document.getElementById(id);
+            const box = document.getElementById(id.replace('cek','proses'));
+            cek.addEventListener('change', () => box.classList.toggle('active', cek.checked));
+        });
+
+        // Tambah Stok
+        document.getElementById('btnTerimaBahan').addEventListener('click', async () => {
+            const jenis = document.getElementById('jenisBahanMasuk').value;
+            const ukuran = document.getElementById('ukuranBahanMasuk').value;
+            const jumlah = parseInt(document.getElementById('jumlahBahanMasuk').value);
+            const satuan = document.getElementById('satuanBahanMasuk').value;
+            if(jumlah<=0) return alert('Isi jumlah dengan benar!');
+
+            const idx = stokBahan.findIndex(s => s.jenis === jenis && s.ukuran === ukuran);
+            if(idx >=0) {
+                stokBahan[idx].stokAwal += jumlah;
+                stokBahan[idx].sisaStok += jumlah;
+            } else {
+                stokBahan.push({jenis, ukuran, stokAwal: jumlah, terpakai:0, sisaStok: jumlah, satuan});
+            }
+            await simpanStokKeServer();
+            alert('Bahan berhasil ditambahkan & tersimpan di server!');
+            document.getElementById('jumlahBahanMasuk').value='';
+        });
+
+        // Reset Stok
+        document.getElementById('btnResetStok').addEventListener('click', async () => {
+            const inputSandi = prompt('⚠️ MASUKKAN SANDI RESET UNTUK MENGHAPUS SEMUA STOK:');
+            if(inputSandi === null) return;
+            if(inputSandi !== sandiReset) return alert('❌ Sandi salah! Data tidak dihapus.');
+            if(confirm('⚠️ Yakin ingin menghapus SELURUH data stok di server?')) {
+                stokBahan = []; await simpanStokKeServer();
+                alert('✅ Stok telah dihapus dari server!');
+            }
+        });
+
+        function tampilkanStok() {
+            const tb = document.getElementById('tabelStokBody');
+            if(stokBahan.length===0) return tb.innerHTML='<tr><td colspan="4" class="p-4 text-center text-gray-500 italic">Belum ada data stok</td></tr>';
+            tb.innerHTML = '';
+            stokBahan.forEach(s => {
+                tb.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50">
+                    <td class="p-2">${s.ukuran}</td><td class="p-2 text-center">${s.stokAwal}</td>
+                    <td class="p-2 text-center">${s.terpakai}</td><td class="p-2 text-center font-bold ${s.sisaStok<=0?'text-danger':'text-success'}">${s.sisaStok}</td>
+                </tr>`;
+            });
+        }
+
+        // Simpan Produksi dengan aturan Rak
+        document.getElementById('formProduksi').addEventListener('submit', async e => {
+            e.preventDefault();
+            
+            // Cek apakah proses sudah selesai semua
+            const sudahSelesai = document.getElementById('cekLem').checked;
+            const kodeRak = document.getElementById('kodeRak').value.trim();
+
+            // Jika selesai, wajib isi kode rak
+            if(sudahSelesai && kodeRak === '') {
+                alert('❌ Kode Rak WAJIB diisi karena proses sudah selesai!');
+                return;
+            }
+
+            const pakai = {
+                'Uk180x360 K200': parseInt(document.getElementById('pakaiUk1').value)||0,
+                'Uk200x300 K200': parseInt(document.getElementById('pakaiUk2').value)||0,
+                'Uk200x300 K275': parseInt(document.getElementById('pakaiUk3').value)||0,
+                'Uk245x300 K200': parseInt(document.getElementById('pakaiUk4').value)||0
+            };
+
+            Object.entries(pakai).forEach(([ukuran, jumlah]) => {
+                if(jumlah<=0) return;
+                const s = stokBahan.find(s=>s.jenis==='Carton Sheet' && s.ukuran===ukuran);
+                if(s) { s.terpakai += jumlah; s.sisaStok = Math.max(0, s.sisaStok - jumlah); }
+            });
+            await simpanStokKeServer();
+
+            const d = {
+                id: Date.now(), tanggal: document.getElementById('tanggal').value,
+                noPo: document.getElementById('noPo').value, kodeProduk: document.getElementById('kodeProduk').value,
+                ukuranProduk: document.getElementById('ukuranProduk').value,
+                potongSelesai: document.getElementById('cekPotong').checked,
+                hasilPotong: parseInt(document.getElementById('potongMasuk').value)||0,
+                cetakSelesai: document.getElementById('cekCetak').checked,
+                hasilCetak: parseInt(document.getElementById('cetakMasuk').value)||0,
+                lemSelesai: sudahSelesai,
+                hasilLem: parseInt(document.getElementById('lemMasuk').value)||0,
+                hasilAkhir: parseInt(document.getElementById('lemBagus').value)||0,
+                target: parseInt(document.getElementById('target').value),
+                kodeRak: kodeRak,
+                keterangan: document.getElementById('keterangan').value,
+                tersimpan: sudahSelesai
+            };
+            dataProduksi.push(d);
+            await simpanProduksiKeServer();
+
+            alert('✅ Data berhasil disimpan ke server pusat! Semua perangkat akan melihat perubahan ini.');
+            document.getElementById('formProduksi').reset();
+            document.getElementById('tanggal').valueAsDate = new Date();
+        });
+
+        // Reset Produksi
+        document.getElementById('btnResetProduksi').addEventListener('click', async () => {
+            const inputSandi = prompt('⚠️ MASUKKAN SANDI RESET UNTUK MENGHAPUS SEMUA DATA DI SERVER:');
+            if(inputSandi === null) return;
+            if(inputSandi !== sandiReset) return alert('❌ Sandi salah! Data tidak dihapus.');
+            if(confirm('⚠️ Yakin ingin menghapus SELURUH data produksi di server pusat?')) {
+                dataProduksi = []; await simpanProduksiKeServer();
+                alert('✅ Data produksi telah dihapus dari server!');
+            }
+        });
+
+        // === FUNGSI MONITORING PROSES ===
+        document.getElementById('btnTampilMonitor').addEventListener('click', tampilkanMonitoring);
+        document.getElementById('btnCetakMonitor').addEventListener('click', () => window.print());
+        document.getElementById('btnUnduhMonitor').addEventListener('click', unduhExcelMonitoring);
+
+        function tampilkanMonitoring() {
+            const tglMulai = document.getElementById('monitorTglMulai').value;
+            const tglSelesai = document.getElementById('monitorTglSelesai').value;
+            let data = [...dataProduksi];
+
+            if(tglMulai && tglSelesai) {
+                data = data.filter(d => d.tanggal >= tglMulai && d.tanggal <= tglSelesai);
+            }
+
+            const tb = document.getElementById('tabelMonitoringBody');
+            if(data.length===0) return tb.innerHTML='<tr><td colspan="8" class="p-4 text-center text-gray-500 italic">Tidak ada data proses</td></tr>';
+            
+            tb.innerHTML = '';
+            data.slice().reverse().forEach(d => {
+                let status = 'Belum Mulai';
+                let warnaStatus = 'bg-gray-100 text-gray-700';
+                if(d.potongSelesai && !d.cetakSelesai) { status = 'Proses Potong'; warnaStatus = 'bg-blue-100 text-blue-700'; }
+                if(d.cetakSelesai && !d.lemSelesai) { status = 'Proses Cetak'; warnaStatus = 'bg-yellow-100 text-yellow-700'; }
+                if(d.lemSelesai) { status = 'Selesai'; warnaStatus = 'bg-green-100 text-green-700'; }
+
+                tb.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50">
+                    <td class="p-2 text-center">${d.tanggal}</td>
+                    <td class="p-2 text-center">${d.noPo}</td>
+                    <td class="p-2 text-center">${d.target.toLocaleString()}</td>
+                    <td class="p-2 text-center ${d.potongSelesai?'text-success font-semibold':'text-gray-400'}">${d.hasilPotong.toLocaleString()}</td>
+                    <td class="p-2 text-center ${d.cetakSelesai?'text-success font-semibold':'text-gray-400'}">${d.hasilCetak.toLocaleString()}</td>
+                    <td class="p-2 text-center ${d.lemSelesai?'text-success font-semibold':'text-gray-400'}">${d.hasilLem.toLocaleString()}</td>
+                    <td class="p-2 text-center font-bold">${d.hasilAkhir.toLocaleString()}</td>
+                    <td class="p-2 text-center"><span class="proses-badge ${warnaStatus}">${status}</span></td>
+                </tr>`;
+            });
+            dataMonitoring = data;
+        }
+
+        function unduhExcelMonitoring() {
+            if(dataMonitoring.length===0) return alert('Tampilkan data terlebih dahulu!');
+            const dataExport = dataMonitoring.map(d => ({
+                'Tanggal': d.tanggal, 'No PO': d.noPo, 'Kode Produk': d.kodeProduk,
+                'Qty': d.target, 'Hasil Potong': d.hasilPotong, 'Hasil Cetak': d.hasilCetak,
+                'Hasil Lem': d.hasilLem, 'Hasil Akhir': d.hasilAkhir,
+                'Status': d.lemSelesai ? 'Selesai' : d.cetakSelesai ? 'Proses Cetak' : d.potongSelesai ? 'Proses Potong' : 'Belum Mulai'
+            }));
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataExport), "Monitoring Proses");
+            XLSX.writeFile(wb, `Monitoring_Proses_${new Date().toISOString().slice(0,10)}.xlsx`);
+        }
+
+        // === FUNGSI LAPORAN BARANG TERSIMPAN ===
+        document.getElementById('btnCari').addEventListener('click', filterLaporan);
+        document.getElementById('btnReset').addEventListener('click', () => {
+            document.getElementById('tglMulai').value = '';
+            document.getElementById('tglSelesai').value = '';
+            document.getElementById('pilihBulan').value = '';
+            tampilkanRiwayat();
+        });
+        document.getElementById('btnCetak').addEventListener('click', () => window.print());
+
+        function filterLaporan() {
+            const tglMulai = document.getElementById('tglMulai').value;
+            const tglSelesai = document.getElementById('tglSelesai').value;
+            const pilihBulan = document.getElementById('pilihBulan').value;
+            dataTerfilter = [...dataProduksi].filter(d => d.tersimpan === true);
+
+            if(pilihBulan) {
+                const [thn, bln] = pilihBulan.split('-');
+                dataTerfilter = dataTerfilter.filter(d => {
+                    const [dt, db, dy] = d.tanggal.split('-');
+                    return dy === thn && db === bln;
+                });
+                document.getElementById('infoPeriode').textContent = `Periode: ${bln}/${thn}`;
+            } else if(tglMulai && tglSelesai) {
+                dataTerfilter = dataTerfilter.filter(d => d.tanggal >= tglMulai && d.tanggal <= tglSelesai);
+                document.getElementById('infoPeriode').textContent = `Periode: ${tglMulai} s/d ${tglSelesai}`;
+            } else {
+                document.getElementById('infoPeriode').textContent = 'Semua Barang Tersimpan';
+            }
+            tampilkanTabelFilter(); hitungRingkasan();
+        }
+
+        function tampilkanRiwayat() {
+            dataTerfilter = [...dataProduksi].filter(d => d.tersimpan === true);
+            document.getElementById('infoPeriode').textContent = 'Semua Barang Tersimpan di Gudang';
+            tampilkanTabelFilter(); hitungRingkasan();
+        }
+
+        function tampilkanTabelFilter() {
+            const tb = document.getElementById('tabelRiwayatBody');
+            if(dataTerfilter.length===0) return tb.innerHTML='<tr><td colspan="6" class="p-4 text-center text-gray-500 italic">Belum ada barang yang selesai disimpan</td></tr>';
+            tb.innerHTML = '';
+            dataTerfilter.slice().reverse().forEach(d => {
+                const persen = d.target>0 ? ((d.hasilAkhir/d.target)*100).toFixed(1) : 0;
+                tb.innerHTML += `<tr class="border-b border-gray-100 hover:bg-gray-50">
+                    <td class="p-2">${d.tanggal}</td><td class="p-2">${d.noPo}</td>
+                    <td class="p-2 font-medium">${d.kodeRak}</td>
+                    <td class="p-2 text-center">${d.target.toLocaleString()}</td>
+                    <td class="p-2 text-center font-bold">${d.hasilAkhir.toLocaleString()}</td>
+                    <td class="p-2 text-center"><span class="badge ${persen>=95?'bg-green-100 text-green-700':'bg-yellow-100 text-yellow-700'}">${persen}%</span></td>
+                </tr>`;
+            });
+        }
+
+        function hitungRingkasan() {
+            const totalTarget = dataTerfilter.reduce((s,d) => s + d.target, 0);
+            const totalHasil = dataTerfilter.reduce((s,d) => s + d.hasilAkhir, 0);
+            const rataCapai = totalTarget>0 ? ((totalHasil/totalTarget)*100).toFixed(1) : 0;
+            document.getElementById('ringkasanCetak').innerHTML = `
+                <div class="bg-blue-50 p-3 rounded-lg text-center"><p class="text-xs text-gray-600">Total Qty</p><p class="text-lg font-bold">${totalTarget.toLocaleString()}</p></div>
+                <div class="bg-green-50 p-3 rounded-lg text-center"><p class="text-xs text-gray-600">Total Hasil Tersimpan</p><p class="text-lg font-bold text-success">${totalHasil.toLocaleString()}</p></div>
+                <div class="bg-yellow-50 p-3 rounded-lg text-center"><p class="text-xs text-gray-600">Rata Capaian</p><p class="text-lg font-bold text-warning">${rataCapai}%</p></div>
+                <div class="bg-gray-50 p-3 rounded-lg text-center"><p class="text-xs text-gray-600">Jumlah PO Selesai</p><p class="text-lg font-bold">${dataTerfilter.length}</p></div>
+            `;
+        }
+
+        document.getElementById('eksporExcel').addEventListener('click', () => {
+            if(dataTerfilter.length===0) return alert('Tidak ada data untuk diekspor!');
+            const wb = XLSX.utils.book_new();
+            XLSX.utils.book_append_sheet(wb, XLSX.utils.json_to_sheet(dataTerfilter), "Barang Tersimpan");
+            XLSX.writeFile(wb, `Barang_Tersimpan_${new Date().toISOString().slice(0,10)}.xlsx`);
+        });
+
+        cekLogin();
+    </script>
+</body>
+</html>
